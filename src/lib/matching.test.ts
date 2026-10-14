@@ -20,4 +20,17 @@ describe("matching engine", () => {
     expect(result.eligibleProfiles).toBe(0);
     expect(result.emptyReasons.length).toBeGreaterThan(0);
   });
+
+  it("exposes element, embedding, and blended similarity scores", () => {
+    const result = runMatching(defaultUser, profiles, defaultFilters, defaultWeights);
+    const [match] = result.matches;
+
+    expect(match.elementScore).toBeGreaterThanOrEqual(0);
+    expect(match.elementScore).toBeLessThanOrEqual(100);
+    expect(match.embeddingScore).toBeGreaterThanOrEqual(0);
+    expect(match.embeddingScore).toBeLessThanOrEqual(100);
+    expect(match.blendedScore).toBe(match.totalScore);
+    expect(match.keywordAnalysis.userKeywords).not.toContain(defaultUser.bio);
+    expect(match.keywordAnalysis.candidateKeywords).not.toContain(match.profile.bio);
+  });
 });

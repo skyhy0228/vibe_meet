@@ -319,6 +319,68 @@ textarea { min-height: 110px; resize: vertical; margin-top: 14px; }
   font-weight: 900;
 }
 .matchMain p { line-height: 1.6; color: inherit; opacity: 0.82; }
+.scoreBreakdown {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.scoreBreakdown.compact {
+  margin: 10px 0 8px;
+}
+.scoreRow {
+  display: grid;
+  grid-template-columns: 92px minmax(80px, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+.scoreRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scoreTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+  overflow: hidden;
+}
+.scoreTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.scoreTrack .element { background: #14b8a6; }
+.scoreTrack .embedding { background: #6366f1; }
+.scoreTrack .final { background: #ec4899; }
+.logicPanel .sectionHead strong {
+  color: #db2777;
+  font-size: 14px;
+}
+.logicGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.logicCard {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.48);
+}
+.dark .logicCard {
+  background: rgba(15, 23, 42, 0.48);
+}
+.logicCard h3 {
+  margin-bottom: 0;
+}
+.logicCard p {
+  margin-bottom: 0;
+  line-height: 1.45;
+  opacity: 0.78;
+  font-size: 13px;
+}
 .chart { width: 100%; min-height: 260px; }
 .flow { display: flex; gap: 10px; flex-wrap: wrap; }
 .flow span { padding: 10px 12px; border-radius: 8px; background: rgba(20, 184, 166, 0.13); font-weight: 800; }
@@ -333,12 +395,14 @@ textarea { min-height: 110px; resize: vertical; margin-top: 14px; }
   .authShell { grid-template-columns: 1fr; margin-top: 20px; }
   .dashboard .hero, .metric, .panel, .split > .panel, .winner, .results > .panel:nth-child(2), .cards { grid-column: 1 / -1; }
   .cards { grid-template-columns: repeat(2, 1fr); }
+  .logicGrid { grid-template-columns: repeat(2, 1fr); }
   .pipeline { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 640px) {
   .app { padding: 14px; }
   .dashboard .hero { min-height: 260px; padding: 24px; }
-  .formGrid, .cards, .scenarioGrid { grid-template-columns: 1fr; }
+  .formGrid, .cards, .scenarioGrid, .logicGrid { grid-template-columns: 1fr; }
+  .scoreRow { grid-template-columns: 84px minmax(64px, 1fr) 32px; }
   h2 { font-size: 22px; }
 }

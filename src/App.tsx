@@ -44,7 +44,13 @@ export function App() {
   const result = useMemo(() => runMatching(user, allProfiles, filters, weights), [user, allProfiles, filters, weights]);
   const normalized = normalizeWeights(weights);
   const top = result.topFive[0];
-  const chartData = result.topFive.map((match) => ({ name: match.profile.name, score: match.totalScore, ...match.scores }));
+  const chartData = result.topFive.map((match) => ({
+    name: match.profile.name,
+    finalScore: match.totalScore,
+    elementScore: match.elementScore,
+    embeddingScore: match.embeddingScore,
+    ...match.scores,
+  }));
   const comparison = compareIds.map((id) => result.matches.find((match) => match.profile.id === id)).filter(Boolean) as CandidateMatch[];
 
   const persistUser = (next: Profile) => {
@@ -298,11 +304,29 @@ function Results({ result, chartData, saveCurrentHistory, savedNotice }: { resul
         <MatchCard match={result.topFive[0]} featured />
       </section>
       <section className="panel">
-        <h2>TOP 5 점수 비교</h2>
+        <h2>TOP 5 유사도 비교</h2>
         <div className="chart">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis domain={[0, 100]} /><Tooltip /><Legend /><Bar dataKey="score" name="전체 점수" fill="#ec4899" /></BarChart>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="elementScore" name="단순 요소" fill="#14b8a6" />
+              <Bar dataKey="embeddingScore" name="키워드 임베딩" fill="#6366f1" />
+              <Bar dataKey="finalScore" name="최종 혼합" fill="#ec4899" />
+            </BarChart>
           </ResponsiveContainer>
+        </div>
+      </section>
+      <section className="panel wide logicPanel">
+        <div className="sectionHead">
+          <h2>추천 로직 한눈에 보기</h2>
+          <strong>카테고리 60% + 단순 요소 20% + 키워드 임베딩 20%</strong>
+        </div>
+        <div className="logicGrid">
+          {result.topFive.map((match) => <SimilarityBreakdown key={match.profile.id} match={match} />)}
         </div>
       </section>
       <section className="cards">
@@ -316,6 +340,23 @@ function Results({ result, chartData, saveCurrentHistory, savedNotice }: { resul
   );
 }
 
+function SimilarityBreakdown({ match }: { match: CandidateMatch }) {
+  const shared = match.keywordAnalysis.sharedKeywords;
+  return (
+    <article className="logicCard">
+      <div className="sectionHead">
+        <h3>{match.profile.name}</h3>
+        <strong>{match.totalScore}점</strong>
+      </div>
+      <ScoreBars match={match} compact />
+      <p>
+        공통 키워드 {shared.length}개
+        {shared.length ? `: ${shared.slice(0, 4).join(", ")}` : ": 직접 겹치는 키워드는 적지만 임베딩 의미 유사도를 반영했습니다."}
+      </p>
+    </article>
+  );
+}
+
 function MatchCard({ match, featured = false }: { match: CandidateMatch; featured?: boolean }) {
   return (
     <article className={featured ? "matchCard featured" : "matchCard"}>
@@ -323,10 +364,30 @@ function MatchCard({ match, featured = false }: { match: CandidateMatch; feature
       <div className="matchMain">
         <div className="sectionHead"><h3>{match.rank}위 · {match.profile.name}</h3><strong>{match.totalScore}점</strong></div>
         <p>{match.profile.age}세 · {match.profile.height}cm · {match.profile.weight}kg · {match.profile.region} · {match.profile.job} · {match.profile.mbti}</p>
+        <ScoreBars match={match} />
         <p>{match.reason}</p>
         <div className="chips">{match.commonInterests.map((item) => <span key={item}>{item}</span>)}</div>
       </div>
     </article>
+  );
+}
+
+function ScoreBars({ match, compact = false }: { match: CandidateMatch; compact?: boolean }) {
+  const rows = [
+    { label: "단순 요소", value: match.elementScore, className: "element" },
+    { label: "키워드 임베딩", value: match.embeddingScore, className: "embedding" },
+    { label: "최종 혼합", value: match.blendedScore, className: "final" },
+  ];
+  return (
+    <div className={compact ? "scoreBreakdown compact" : "scoreBreakdown"}>
+      {rows.map((row) => (
+        <div className="scoreRow" key={row.label}>
+          <span>{row.label}</span>
+          <div className="scoreTrack"><i className={row.className} style={{ width: `${row.value}%` }} /></div>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -359,7 +420,8 @@ function Compare({ result, compareIds, setCompareIds, comparison }: {
       <section className="panel wide">
         <h2>알고리즘 설명</h2>
         <p>필수 조건은 후보를 완전히 제외하는 하드 필터입니다. 통과한 후보에게만 성격, 관심사, 가치관, 데이트 스타일, 연락 패턴 점수를 0~100으로 계산합니다.</p>
-        <p>최종 점수는 정규화된 가중치와 항목별 점수의 가중합입니다. 동점자는 가치관 점수, 나이, 프로필 ID 순서로 결정됩니다.</p>
+        <p>단순 요소 유사도는 관심사, 가치관, 선호 데이트 키워드의 중복이 많을수록 높아집니다. 키워드 임베딩 유사도는 자기소개를 제외하고, 미리 정의한 키워드 벡터만 평균낸 뒤 코사인 유사도로 계산합니다.</p>
+        <p>최종 혼합 점수는 기존 항목별 가중 점수 60%, 단순 요소 유사도 20%, 키워드 임베딩 유사도 20%를 합쳐 산출합니다. 동점자는 가치관 점수, 나이, 프로필 ID 순서로 결정됩니다.</p>
       </section>
     </div>
   );

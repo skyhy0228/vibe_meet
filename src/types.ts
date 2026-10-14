@@ -74,8 +74,18 @@ export interface CategoryScores {
 export interface CandidateMatch {
   profile: Profile;
   totalScore: number;
+  elementScore: number;
+  embeddingScore: number;
+  blendedScore: number;
   rank: number;
   scores: CategoryScores;
+  keywordAnalysis: {
+    userKeywords: string[];
+    candidateKeywords: string[];
+    sharedKeywords: string[];
+    elementScore: number;
+    embeddingScore: number;
+  };
   commonInterests: string[];
   commonValues: string[];
   strengths: string[];

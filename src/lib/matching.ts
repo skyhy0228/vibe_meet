@@ -1,6 +1,43 @@
 import type { CandidateMatch, CategoryKey, CategoryScores, FilterStep, HardFilters, MatchResult, Profile, Weights } from "../types";
 
 const contactScore = { 낮음: 1, 보통: 3, 높음: 5 } as const;
+const keywordEmbeddings: Record<string, number[]> = {
+  여행: [0.9, 0.4, 0.2, 0.7, 0.3, 0.2],
+  영화: [0.4, 0.9, 0.2, 0.3, 0.5, 0.6],
+  러닝: [0.8, 0.2, 0.8, 0.6, 0.2, 0.1],
+  전시: [0.3, 0.8, 0.1, 0.4, 0.8, 0.5],
+  와인: [0.2, 0.6, 0.1, 0.3, 0.7, 0.8],
+  등산: [0.9, 0.2, 0.9, 0.8, 0.2, 0.1],
+  요리: [0.2, 0.5, 0.3, 0.4, 0.6, 0.8],
+  독서: [0.1, 0.8, 0.1, 0.2, 0.9, 0.4],
+  재즈: [0.2, 0.9, 0.1, 0.2, 0.7, 0.7],
+  사진: [0.4, 0.8, 0.2, 0.5, 0.8, 0.5],
+  캠핑: [0.9, 0.2, 0.7, 0.8, 0.3, 0.2],
+  수영: [0.8, 0.2, 0.9, 0.6, 0.2, 0.1],
+  보드게임: [0.3, 0.5, 0.2, 0.7, 0.5, 0.4],
+  뮤지컬: [0.2, 0.9, 0.1, 0.4, 0.8, 0.6],
+  카페: [0.2, 0.6, 0.1, 0.3, 0.7, 0.7],
+  반려식물: [0.1, 0.5, 0.2, 0.2, 0.8, 0.6],
+  클라이밍: [0.9, 0.2, 0.9, 0.7, 0.2, 0.1],
+  테니스: [0.8, 0.2, 0.8, 0.6, 0.2, 0.1],
+  성장: [0.5, 0.3, 0.5, 0.9, 0.6, 0.3],
+  배려: [0.2, 0.4, 0.2, 0.8, 0.7, 0.8],
+  정직: [0.2, 0.3, 0.2, 0.9, 0.8, 0.5],
+  안정: [0.1, 0.3, 0.2, 0.6, 0.8, 0.8],
+  자유: [0.8, 0.4, 0.4, 0.7, 0.4, 0.4],
+  유머: [0.4, 0.7, 0.3, 0.8, 0.4, 0.7],
+  가족: [0.1, 0.3, 0.2, 0.7, 0.7, 0.9],
+  성취: [0.5, 0.2, 0.6, 0.9, 0.5, 0.3],
+  신뢰: [0.2, 0.3, 0.2, 0.9, 0.8, 0.7],
+  대화: [0.3, 0.7, 0.2, 0.8, 0.7, 0.8],
+  맛집: [0.3, 0.5, 0.2, 0.5, 0.6, 0.8],
+  산책: [0.5, 0.4, 0.4, 0.5, 0.7, 0.6],
+  드라이브: [0.8, 0.4, 0.3, 0.6, 0.4, 0.5],
+  공연: [0.2, 0.9, 0.1, 0.4, 0.8, 0.6],
+  홈쿠킹: [0.1, 0.5, 0.2, 0.4, 0.7, 0.9],
+  스포츠: [0.8, 0.2, 0.8, 0.6, 0.2, 0.1],
+  야경: [0.5, 0.6, 0.1, 0.4, 0.7, 0.7],
+};
 
 export function normalizeWeights(weights: Weights): Weights {
   const sum = Object.values(weights).reduce((total, value) => total + Math.max(0, value), 0) || 1;
@@ -18,6 +55,23 @@ const overlapScore = (a: string[], b: string[]) => {
   return clampScore((common / union.size) * 100 + Math.min(common, 3) * 8);
 };
 
+const unique = (items: string[]) => Array.from(new Set(items));
+const keywordSet = (profile: Profile) => unique([...profile.interests, ...profile.values, ...profile.preferredDates]);
+const vectorForKeyword = (keyword: string) => keywordEmbeddings[keyword] || [0.4, 0.4, 0.4, 0.4, 0.4, 0.4];
+const averageVector = (keywords: string[]) => {
+  const vectors = keywords.map(vectorForKeyword);
+  const dimensions = vectors[0]?.length || 6;
+  return Array.from({ length: dimensions }, (_, index) => vectors.reduce((sum, vector) => sum + vector[index], 0) / Math.max(vectors.length, 1));
+};
+const cosineSimilarity = (a: number[], b: number[]) => {
+  const dot = a.reduce((sum, value, index) => sum + value * b[index], 0);
+  const magnitudeA = Math.sqrt(a.reduce((sum, value) => sum + value * value, 0));
+  const magnitudeB = Math.sqrt(b.reduce((sum, value) => sum + value * value, 0));
+  if (!magnitudeA || !magnitudeB) return 0;
+  return dot / (magnitudeA * magnitudeB);
+};
+const embeddingKeywordScore = (a: string[], b: string[]) => clampScore(cosineSimilarity(averageVector(a), averageVector(b)) * 100);
+
 function mbtiScore(a: string, b: string) {
   const same = [...a].filter((letter, index) => b[index] === letter).length;
   return same * 20 + (a[0] !== b[0] ? 10 : 0) + (a[1] === b[1] ? 10 : 0);
@@ -26,6 +80,11 @@ function mbtiScore(a: string, b: string) {
 export function scoreProfile(user: Profile, candidate: Profile, weights: Weights): Omit<CandidateMatch, "rank"> {
   const commonInterests = user.interests.filter((item) => candidate.interests.includes(item));
   const commonValues = user.values.filter((item) => candidate.values.includes(item));
+  const userKeywords = keywordSet(user);
+  const candidateKeywords = keywordSet(candidate);
+  const sharedKeywords = userKeywords.filter((item) => candidateKeywords.includes(item));
+  const elementScore = overlapScore(userKeywords, candidateKeywords);
+  const embeddingScore = embeddingKeywordScore(userKeywords, candidateKeywords);
   const scores: CategoryScores = {
     personality: clampScore((mbtiScore(user.mbti, candidate.mbti) + scaleDiff(user.extroversion, candidate.extroversion, 4)) / 2),
     interests: overlapScore(user.interests, candidate.interests),
@@ -37,11 +96,25 @@ export function scoreProfile(user: Profile, candidate: Profile, weights: Weights
   const totalScore = clampScore(
     (Object.keys(scores) as CategoryKey[]).reduce((total, key) => total + scores[key] * (normalized[key] / 100), 0)
   );
+  const blendedScore = clampScore(totalScore * 0.6 + elementScore * 0.2 + embeddingScore * 0.2);
   const sortedStrengths = (Object.entries(scores) as Array<[CategoryKey, number]>).sort((a, b) => b[1] - a[1]);
   const strengths = sortedStrengths.slice(0, 2).map(([key]) => categoryLabel[key]);
   const differences = sortedStrengths.slice(-2).reverse().map(([key]) => categoryLabel[key]);
-  const reason = buildReason(candidate, totalScore, scores, commonInterests, commonValues, strengths, differences);
-  return { profile: candidate, totalScore, scores, commonInterests, commonValues, strengths, differences, reason };
+  const reason = buildReason(candidate, blendedScore, scores, commonInterests, commonValues, strengths, differences, elementScore, embeddingScore);
+  return {
+    profile: candidate,
+    totalScore: blendedScore,
+    elementScore,
+    embeddingScore,
+    blendedScore,
+    scores,
+    keywordAnalysis: { userKeywords, candidateKeywords, sharedKeywords, elementScore, embeddingScore },
+    commonInterests,
+    commonValues,
+    strengths,
+    differences,
+    reason,
+  };
 }
 
 export const categoryLabel: Record<CategoryKey, string> = {
@@ -59,13 +132,15 @@ function buildReason(
   commonInterests: string[],
   commonValues: string[],
   strengths: string[],
-  differences: string[]
+  differences: string[],
+  elementScore: number,
+  embeddingScore: number
 ) {
   const interestText = commonInterests.length ? `${commonInterests.slice(0, 3).join(", ")} 관심사가 겹치고` : "공통 관심사는 적지만";
   const valueText = commonValues.length ? `${commonValues.join(", ")} 가치관이 맞습니다` : "가치관은 추가 대화가 필요합니다";
   const strongest = strengths[0];
   const weakest = differences[0];
-  return `${candidate.name}님은 전체 적합도 ${totalScore}점입니다. ${interestText}, ${valueText}. 특히 ${strongest} 항목이 ${Math.max(...Object.values(scores))}점으로 높아 추천 순위에 긍정적으로 작용했습니다. ${weakest} 항목은 상대적으로 차이가 있어 실제 만남 전 기대치를 맞춰보는 것이 좋습니다.`;
+  return `${candidate.name}님은 전체 적합도 ${totalScore}점입니다. ${interestText}, ${valueText}. 단순 요소 유사도는 ${elementScore}점, 키워드 임베딩 유사도는 ${embeddingScore}점입니다. 특히 ${strongest} 항목이 ${Math.max(...Object.values(scores))}점으로 높아 추천 순위에 긍정적으로 작용했습니다. ${weakest} 항목은 상대적으로 차이가 있어 실제 만남 전 기대치를 맞춰보는 것이 좋습니다.`;
 }
 
 const filters: Array<{
