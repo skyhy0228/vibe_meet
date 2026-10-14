@@ -12,6 +12,7 @@ export interface Profile {
   age: number;
   gender: Gender;
   height: number;
+  weight: number;
   region: string;
   job: string;
   mbti: string;
@@ -35,6 +36,8 @@ export interface HardFilters {
   maxAge: number;
   minHeight: number;
   maxHeight: number;
+  minWeight: number;
+  maxWeight: number;
   regions: string[];
   smoking: Smoking | "상관없음";
   religion: Religion | "상관없음";

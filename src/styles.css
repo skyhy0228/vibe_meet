@@ -74,6 +74,13 @@ nav button.active, .primary, .chips .selected {
   box-shadow: 0 14px 34px rgba(236, 72, 153, 0.28);
 }
 
+.heroActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 section, .panel, .matchCard {
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(255, 255, 255, 0.78);

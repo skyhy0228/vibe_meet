@@ -76,6 +76,7 @@ const filters: Array<{
   { key: "gender", label: "성별 조건", pass: (p, f) => f.gender === "상관없음" || p.gender === f.gender },
   { key: "minAge", label: "나이 범위", pass: (p, f) => p.age >= f.minAge && p.age <= f.maxAge },
   { key: "minHeight", label: "키 범위", pass: (p, f) => p.height >= f.minHeight && p.height <= f.maxHeight },
+  { key: "minWeight", label: "몸무게 범위", pass: (p, f) => p.weight >= f.minWeight && p.weight <= f.maxWeight },
   { key: "regions", label: "거주 지역", pass: (p, f) => !f.regions.length || f.regions.includes(p.region) },
   { key: "smoking", label: "흡연 여부", pass: (p, f) => f.smoking === "상관없음" || p.smoking === f.smoking },
   { key: "religion", label: "종교 조건", pass: (p, f) => f.religion === "상관없음" || p.religion === f.religion },

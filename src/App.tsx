@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, Brain, Moon, Play, Save, Sparkles, Sun, Trash2, Users } from "lucide-react";
+import { BarChart3, Brain, Moon, Play, Save, Search, Sparkles, Sun, Trash2, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -34,7 +34,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>("대시보드");
   const [user, setUser] = useState<Profile>(() => {
     const saved = localStorage.getItem("vibe-meet-user");
-    return saved ? JSON.parse(saved) : defaultUser;
+    return saved ? { ...defaultUser, ...JSON.parse(saved) } : defaultUser;
   });
   const [filters, setFilters] = useState<HardFilters>(defaultFilters);
   const [weights, setWeights] = useState<Weights>(defaultWeights);
@@ -109,7 +109,10 @@ function Dashboard({ result, top, setTab, history }: { result: ReturnType<typeof
           <p className="eyebrow">필터링부터 추천 이유까지</p>
           <h2>조건을 바꾸면 매칭 결과가 즉시 다시 계산됩니다.</h2>
           <p>외부 AI API 없이 로컬 데이터와 투명한 점수 계산으로 TOP 5 추천, 설명, 비교, 기록까지 제공합니다.</p>
-          <button className="primary" onClick={() => setTab("조건 설정")}><Play size={18} /> 매칭 시작</button>
+          <div className="heroActions">
+            <button className="primary" onClick={() => setTab("매칭 결과")}><Search size={18} /> 바로 검색</button>
+            <button className="secondary" onClick={() => setTab("조건 설정")}><Play size={18} /> 조건 조정</button>
+          </div>
         </div>
       </section>
       <Metric icon={<Users />} label="가상 프로필" value={`${profiles.length}명`} />
@@ -129,7 +132,7 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
 
 function ProfileEditor({ user, persistUser }: { user: Profile; persistUser: (user: Profile) => void }) {
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) => persistUser({ ...user, [key]: value });
-  const progress = ["name", "age", "gender", "height", "region", "job", "mbti", "interests", "values", "bio"].filter((key) => Boolean(user[key as keyof Profile])).length * 10;
+  const progress = Math.min(100, ["name", "age", "gender", "height", "weight", "region", "job", "mbti", "interests", "values", "bio"].filter((key) => Boolean(user[key as keyof Profile])).length * 9);
   return (
     <div className="panel">
       <div className="sectionHead"><h2>내 프로필</h2><span>{progress}% 완료</span></div>
@@ -139,6 +142,7 @@ function ProfileEditor({ user, persistUser }: { user: Profile; persistUser: (use
         <Field label="나이"><input type="number" value={user.age} onChange={(e) => update("age", Number(e.target.value))} /></Field>
         <Field label="성별"><Select value={user.gender} onChange={(v) => update("gender", v as Gender)} options={["여성", "남성", "논바이너리"]} /></Field>
         <Field label="키"><input type="number" value={user.height} onChange={(e) => update("height", Number(e.target.value))} /></Field>
+        <Field label="몸무게"><input type="number" value={user.weight} onChange={(e) => update("weight", Number(e.target.value))} /></Field>
         <Field label="지역"><Select value={user.region} onChange={(v) => update("region", v)} options={regions} /></Field>
         <Field label="직업"><input value={user.job} onChange={(e) => update("job", e.target.value)} /></Field>
         <Field label="MBTI"><input value={user.mbti} maxLength={4} onChange={(e) => update("mbti", e.target.value.toUpperCase())} /></Field>
@@ -169,6 +173,7 @@ function ConditionPanel({ filters, setFilters, weights, setWeights, result, norm
           <Field label="성별"><Select value={filters.gender} onChange={(v) => set("gender", v as HardFilters["gender"])} options={["상관없음", "여성", "남성", "논바이너리"]} /></Field>
           <Field label="나이"><RangePair min={filters.minAge} max={filters.maxAge} setMin={(v) => set("minAge", v)} setMax={(v) => set("maxAge", v)} /></Field>
           <Field label="키"><RangePair min={filters.minHeight} max={filters.maxHeight} setMin={(v) => set("minHeight", v)} setMax={(v) => set("maxHeight", v)} /></Field>
+          <Field label="몸무게"><RangePair min={filters.minWeight} max={filters.maxWeight} setMin={(v) => set("minWeight", v)} setMax={(v) => set("maxWeight", v)} /></Field>
           <Field label="지역"><ChipPicker values={regions} selected={filters.regions} onChange={(v) => set("regions", v)} /></Field>
           <Field label="흡연"><Select value={filters.smoking} onChange={(v) => set("smoking", v as HardFilters["smoking"])} options={["상관없음", "비흡연", "가끔", "흡연"]} /></Field>
           <Field label="종교"><Select value={filters.religion} onChange={(v) => set("religion", v as HardFilters["religion"])} options={["상관없음", "무교", "기독교", "천주교", "불교", "기타"]} /></Field>
@@ -227,7 +232,7 @@ function MatchCard({ match, featured = false }: { match: CandidateMatch; feature
       <div className="avatar" style={{ background: match.profile.avatarColor }}>{match.profile.name.slice(0, 1)}</div>
       <div className="matchMain">
         <div className="sectionHead"><h3>{match.rank}위 · {match.profile.name}</h3><strong>{match.totalScore}점</strong></div>
-        <p>{match.profile.age}세 · {match.profile.region} · {match.profile.job} · {match.profile.mbti}</p>
+        <p>{match.profile.age}세 · {match.profile.height}cm · {match.profile.weight}kg · {match.profile.region} · {match.profile.job} · {match.profile.mbti}</p>
         <p>{match.reason}</p>
         <div className="chips">{match.commonInterests.map((item) => <span key={item}>{item}</span>)}</div>
       </div>
