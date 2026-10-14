@@ -1,16 +1,16 @@
 import type { HardFilters, MatchHistory, Weights } from "../types";
 
-const HISTORY_KEY = "vibe-meet-history";
+const historyKey = (accountId?: string) => `vibe-meet-history${accountId ? `-${accountId}` : ""}`;
 
-export function loadHistory(): MatchHistory[] {
+export function loadHistory(accountId?: string): MatchHistory[] {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]") as MatchHistory[];
+    return JSON.parse(localStorage.getItem(historyKey(accountId)) || "[]") as MatchHistory[];
   } catch {
     return [];
   }
 }
 
-export function saveHistory(filters: HardFilters, weights: Weights, topFive: MatchHistory["topFive"]) {
+export function saveHistory(accountId: string | undefined, filters: HardFilters, weights: Weights, topFive: MatchHistory["topFive"]) {
   const next: MatchHistory = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
@@ -18,10 +18,10 @@ export function saveHistory(filters: HardFilters, weights: Weights, topFive: Mat
     weights,
     topFive,
   };
-  localStorage.setItem(HISTORY_KEY, JSON.stringify([next, ...loadHistory()].slice(0, 12)));
+  localStorage.setItem(historyKey(accountId), JSON.stringify([next, ...loadHistory(accountId)].slice(0, 12)));
   return next;
 }
 
-export function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY);
+export function clearHistory(accountId?: string) {
+  localStorage.removeItem(historyKey(accountId));
 }

@@ -8,6 +8,7 @@ export type CategoryKey = "personality" | "interests" | "values" | "dateStyle" |
 
 export interface Profile {
   id: string;
+  ownerId?: string;
   name: string;
   age: number;
   gender: Gender;
@@ -28,6 +29,23 @@ export interface Profile {
   preferredDates: string[];
   avatarColor: string;
   isUser?: boolean;
+}
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
+  lastLoginAt: string;
+  consentAccepted: boolean;
+  profileVisible: boolean;
+  profile: Profile;
+}
+
+export interface AuthSession {
+  accountId: string;
+  email: string;
+  signedInAt: string;
 }
 
 export interface HardFilters {

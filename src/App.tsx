@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, Brain, Moon, Play, Save, Search, Sparkles, Sun, Trash2, Users } from "lucide-react";
+import { BarChart3, Brain, LogOut, Moon, Play, Save, Search, ShieldCheck, Sparkles, Sun, Trash2, UserPlus, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -17,9 +17,10 @@ import {
   YAxis,
 } from "recharts";
 import { defaultFilters, defaultUser, defaultWeights, profiles } from "./data/profiles";
+import { deleteAccount, getCurrentAccount, getVisibleUserProfiles, signIn, signOut, signUp, updateAccountProfile, updateProfileVisibility } from "./lib/auth";
 import { categoryLabel, normalizeWeights, runMatching } from "./lib/matching";
 import { clearHistory, loadHistory, saveHistory } from "./lib/storage";
-import type { CandidateMatch, CategoryKey, ContactStyle, Gender, HardFilters, MatchHistory, Profile, Religion, Smoking, Weights } from "./types";
+import type { CandidateMatch, CategoryKey, ContactStyle, Gender, HardFilters, MatchHistory, Profile, Religion, Smoking, UserAccount, Weights } from "./types";
 
 const regions = ["서울", "경기", "인천", "부산", "대전", "대구", "광주", "제주"];
 const interests = ["여행", "영화", "러닝", "전시", "와인", "등산", "요리", "독서", "재즈", "사진", "캠핑", "수영", "보드게임", "뮤지컬", "카페", "반려식물", "클라이밍", "테니스"];
@@ -32,28 +33,27 @@ type Tab = (typeof tabs)[number];
 export function App() {
   const [dark, setDark] = useState(false);
   const [tab, setTab] = useState<Tab>("대시보드");
-  const [user, setUser] = useState<Profile>(() => {
-    const saved = localStorage.getItem("vibe-meet-user");
-    return saved ? { ...defaultUser, ...JSON.parse(saved) } : defaultUser;
-  });
+  const [account, setAccount] = useState<UserAccount | null>(() => getCurrentAccount());
+  const user = account?.profile || defaultUser;
   const [filters, setFilters] = useState<HardFilters>(defaultFilters);
   const [weights, setWeights] = useState<Weights>(defaultWeights);
-  const [history, setHistory] = useState<MatchHistory[]>(loadHistory());
+  const [history, setHistory] = useState<MatchHistory[]>(() => loadHistory(account?.id));
   const [savedNotice, setSavedNotice] = useState("");
   const [compareIds, setCompareIds] = useState<[string, string]>(["", ""]);
-  const result = useMemo(() => runMatching(user, profiles, filters, weights), [user, filters, weights]);
+  const allProfiles = useMemo(() => [...profiles, ...getVisibleUserProfiles(account?.id)], [account?.id]);
+  const result = useMemo(() => runMatching(user, allProfiles, filters, weights), [user, allProfiles, filters, weights]);
   const normalized = normalizeWeights(weights);
   const top = result.topFive[0];
   const chartData = result.topFive.map((match) => ({ name: match.profile.name, score: match.totalScore, ...match.scores }));
   const comparison = compareIds.map((id) => result.matches.find((match) => match.profile.id === id)).filter(Boolean) as CandidateMatch[];
 
   const persistUser = (next: Profile) => {
-    setUser(next);
-    localStorage.setItem("vibe-meet-user", JSON.stringify(next));
+    if (!account) return;
+    setAccount(updateAccountProfile(account.id, next));
   };
 
   const saveCurrentHistory = () => {
-    const next = saveHistory(filters, weights, result.topFive.map((match) => ({ id: match.profile.id, name: match.profile.name, score: match.totalScore })));
+    const next = saveHistory(account?.id, filters, weights, result.topFive.map((match) => ({ id: match.profile.id, name: match.profile.name, score: match.totalScore })));
     setHistory([next, ...history].slice(0, 12));
     setSavedNotice("현재 매칭 결과를 저장했습니다.");
     window.setTimeout(() => setSavedNotice(""), 1800);
@@ -72,6 +72,34 @@ export function App() {
     setTab("매칭 결과");
   };
 
+  const handleAuthenticated = (next: UserAccount) => {
+    setAccount(next);
+    setHistory(loadHistory(next.id));
+    setTab("대시보드");
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    setAccount(null);
+    setHistory([]);
+    setTab("대시보드");
+  };
+
+  if (!account) {
+    return (
+      <main className={dark ? "app dark" : "app"}>
+        <header className="topbar authTopbar">
+          <div>
+            <p className="eyebrow">AI 스타일 소개팅 매칭</p>
+            <h1>Vibe Meet</h1>
+          </div>
+          <button className="iconButton" onClick={() => setDark(!dark)} title="테마 전환">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+        </header>
+        <AuthScreen onAuthenticated={handleAuthenticated} />
+      </main>
+    );
+  }
+
   return (
     <main className={dark ? "app dark" : "app"}>
       <header className="topbar">
@@ -84,24 +112,79 @@ export function App() {
             <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>
           ))}
         </nav>
-        <button className="iconButton" onClick={() => setDark(!dark)} title="테마 전환">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+        <div className="accountActions">
+          <span>{account.email}</span>
+          <button className="iconButton" onClick={() => setDark(!dark)} title="테마 전환">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <button className="iconButton" onClick={handleSignOut} title="로그아웃"><LogOut size={18} /></button>
+        </div>
       </header>
 
       <AnimatePresence mode="wait">
         <motion.section key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.22 }}>
-          {tab === "대시보드" && <Dashboard result={result} top={top} setTab={setTab} history={history} />}
-          {tab === "내 프로필" && <ProfileEditor user={user} persistUser={persistUser} />}
+          {tab === "대시보드" && <Dashboard result={result} top={top} setTab={setTab} history={history} profileCount={allProfiles.length} />}
+          {tab === "내 프로필" && <ProfileEditor user={user} account={account} persistUser={persistUser} onVisibilityChange={(visible) => setAccount(updateProfileVisibility(account.id, visible))} onDeleteAccount={() => { deleteAccount(account.id); setAccount(null); }} />}
           {tab === "조건 설정" && <ConditionPanel filters={filters} setFilters={setFilters} weights={weights} setWeights={setWeights} result={result} normalized={normalized} />}
           {tab === "매칭 결과" && <Results result={result} chartData={chartData} saveCurrentHistory={saveCurrentHistory} savedNotice={savedNotice} />}
           {tab === "비교 분석" && <Compare result={result} compareIds={compareIds} setCompareIds={setCompareIds} comparison={comparison} />}
-          {tab === "기록/테스트" && <HistoryAndTests history={history} setHistory={setHistory} applyScenario={applyScenario} />}
+          {tab === "기록/테스트" && <HistoryAndTests history={history} setHistory={setHistory} applyScenario={applyScenario} accountId={account.id} />}
         </motion.section>
       </AnimatePresence>
     </main>
   );
 }
 
-function Dashboard({ result, top, setTab, history }: { result: ReturnType<typeof runMatching>; top?: CandidateMatch; setTab: (tab: Tab) => void; history: MatchHistory[] }) {
+function AuthScreen({ onAuthenticated }: { onAuthenticated: (account: UserAccount) => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [consent, setConsent] = useState(true);
+  const [error, setError] = useState("");
+
+  const submit = () => {
+    try {
+      setError("");
+      const account = mode === "signup" ? signUp(email, password, name, consent) : signIn(email, password);
+      onAuthenticated(account);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그인 처리 중 오류가 발생했습니다.");
+    }
+  };
+
+  return (
+    <section className="authShell">
+      <div className="authHero">
+        <p className="eyebrow">서비스형 프로필 매칭</p>
+        <h2>로그인하고 내 프로필을 저장하세요.</h2>
+        <p>회원별 프로필, 매칭 기록, 공개 여부를 분리했습니다. 지금은 GitHub Pages에서 동작하도록 브라우저 저장소를 사용하며, 실제 출시 시 Firebase/Auth API로 교체 가능한 구조입니다.</p>
+        <div className="serviceChecklist">
+          <span><ShieldCheck size={17} /> 세션 유지</span>
+          <span><Users size={17} /> 사용자 공개 프로필 후보 반영</span>
+          <span><UserPlus size={17} /> 가입 후 바로 프로필 수정</span>
+        </div>
+      </div>
+      <div className="panel authPanel">
+        <div className="segmented">
+          <button className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>회원가입</button>
+          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>로그인</button>
+        </div>
+        {mode === "signup" && <Field label="이름"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="프로필 이름" /></Field>}
+        <Field label="이메일"><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></Field>
+        <Field label="비밀번호"><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="6자 이상" /></Field>
+        {mode === "signup" && (
+          <label className="checkRow">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>프로필과 매칭 기록이 이 브라우저에 저장되는 것에 동의합니다.</span>
+          </label>
+        )}
+        {error && <p className="formError">{error}</p>}
+        <button className="primary fullWidth" onClick={submit}>{mode === "signup" ? "가입하고 시작" : "로그인"}</button>
+      </div>
+    </section>
+  );
+}
+
+function Dashboard({ result, top, setTab, history, profileCount }: { result: ReturnType<typeof runMatching>; top?: CandidateMatch; setTab: (tab: Tab) => void; history: MatchHistory[]; profileCount: number }) {
   return (
     <div className="grid dashboard">
       <section className="hero">
@@ -115,7 +198,7 @@ function Dashboard({ result, top, setTab, history }: { result: ReturnType<typeof
           </div>
         </div>
       </section>
-      <Metric icon={<Users />} label="가상 프로필" value={`${profiles.length}명`} />
+      <Metric icon={<Users />} label="매칭 후보" value={`${profileCount}명`} />
       <Metric icon={<Sparkles />} label="필터 통과" value={`${result.eligibleProfiles}명`} />
       <Metric icon={<BarChart3 />} label="현재 1위" value={top ? `${top.profile.name} ${top.totalScore}점` : "없음"} />
       <section className="panel wide">
@@ -130,12 +213,19 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
   return <section className="panel metric">{icon}<span>{label}</span><strong>{value}</strong></section>;
 }
 
-function ProfileEditor({ user, persistUser }: { user: Profile; persistUser: (user: Profile) => void }) {
+function ProfileEditor({ user, account, persistUser, onVisibilityChange, onDeleteAccount }: { user: Profile; account: UserAccount; persistUser: (user: Profile) => void; onVisibilityChange: (visible: boolean) => void; onDeleteAccount: () => void }) {
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) => persistUser({ ...user, [key]: value });
   const progress = Math.min(100, ["name", "age", "gender", "height", "weight", "region", "job", "mbti", "interests", "values", "bio"].filter((key) => Boolean(user[key as keyof Profile])).length * 9);
   return (
     <div className="panel">
       <div className="sectionHead"><h2>내 프로필</h2><span>{progress}% 완료</span></div>
+      <div className="profileControls">
+        <label className="checkRow">
+          <input type="checkbox" checked={account.profileVisible} onChange={(e) => onVisibilityChange(e.target.checked)} />
+          <span>내 프로필을 다른 로그인 사용자 매칭 후보에 포함</span>
+        </label>
+        <button className="secondary danger" onClick={() => { if (confirm("계정과 저장된 프로필을 삭제할까요?")) onDeleteAccount(); }}><Trash2 size={16} /> 계정 삭제</button>
+      </div>
       <div className="progress"><span style={{ width: `${progress}%` }} /></div>
       <div className="formGrid">
         <Field label="이름"><input value={user.name} onChange={(e) => update("name", e.target.value)} /></Field>
@@ -275,8 +365,8 @@ function Compare({ result, compareIds, setCompareIds, comparison }: {
   );
 }
 
-function HistoryAndTests({ history, setHistory, applyScenario }: { history: MatchHistory[]; setHistory: (history: MatchHistory[]) => void; applyScenario: (scenario: string) => void }) {
-  const clear = () => { clearHistory(); setHistory([]); };
+function HistoryAndTests({ history, setHistory, applyScenario, accountId }: { history: MatchHistory[]; setHistory: (history: MatchHistory[]) => void; applyScenario: (scenario: string) => void; accountId: string }) {
+  const clear = () => { clearHistory(accountId); setHistory([]); };
   return (
     <div className="split">
       <section className="panel">
