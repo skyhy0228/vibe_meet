@@ -229,10 +229,10 @@ function ProfileEditor({ user, account, persistUser, onVisibilityChange, onDelet
       <div className="progress"><span style={{ width: `${progress}%` }} /></div>
       <div className="formGrid">
         <Field label="이름"><input value={user.name} onChange={(e) => update("name", e.target.value)} /></Field>
-        <Field label="나이"><input type="number" value={user.age} onChange={(e) => update("age", Number(e.target.value))} /></Field>
+        <Field label="나이"><NumericInput value={user.age} onChange={(value) => update("age", value)} /></Field>
         <Field label="성별"><Select value={user.gender} onChange={(v) => update("gender", v as Gender)} options={["여성", "남성", "논바이너리"]} /></Field>
-        <Field label="키"><input type="number" value={user.height} onChange={(e) => update("height", Number(e.target.value))} /></Field>
-        <Field label="몸무게"><input type="number" value={user.weight} onChange={(e) => update("weight", Number(e.target.value))} /></Field>
+        <Field label="키"><NumericInput value={user.height} onChange={(value) => update("height", value)} /></Field>
+        <Field label="몸무게"><NumericInput value={user.weight} onChange={(value) => update("weight", value)} /></Field>
         <Field label="지역"><Select value={user.region} onChange={(v) => update("region", v)} options={regions} /></Field>
         <Field label="직업"><input value={user.job} onChange={(e) => update("job", e.target.value)} /></Field>
         <Field label="MBTI"><input value={user.mbti} maxLength={4} onChange={(e) => update("mbti", e.target.value.toUpperCase())} /></Field>
@@ -400,8 +400,21 @@ function Select({ value, onChange, options, labels = {} }: { value: string; onCh
   return <select value={value} onChange={(e) => onChange(e.target.value)}>{options.map((option) => <option key={option} value={option}>{labels[option] || option || "선택"}</option>)}</select>;
 }
 
+function NumericInput({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const normalize = (raw: string) => raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return (
+    <input
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={String(value)}
+      onChange={(event) => onChange(Number(normalize(event.target.value) || "0"))}
+      onBlur={(event) => onChange(Number(normalize(event.target.value) || "0"))}
+    />
+  );
+}
+
 function RangePair({ min, max, setMin, setMax }: { min: number; max: number; setMin: (value: number) => void; setMax: (value: number) => void }) {
-  return <div className="rangePair"><input type="number" value={min} onChange={(e) => setMin(Number(e.target.value))} /><input type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} /></div>;
+  return <div className="rangePair"><NumericInput value={min} onChange={setMin} /><NumericInput value={max} onChange={setMax} /></div>;
 }
 
 function ChipPicker({ values, selected, onChange }: { values: string[]; selected: string[]; onChange: (selected: string[]) => void }) {
